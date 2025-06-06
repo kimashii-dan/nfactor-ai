@@ -6,6 +6,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic import BaseModel
+import requests
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
@@ -27,5 +28,24 @@ app = FastAPI()
 @app.post("/analyze")
 def analyze(request: AnalyzeRequest):
     result = analyzer_agent.run_sync(request.text)
-    return {"response": result.output}
+    classification = result.output.classification
+
+    if classification == "fact":
+        verify_response = requests.post(
+            "http://localhost:8000/verify", 
+            json={"text": request.text}
+        )
+
+        if verify_response.ok:
+            verified = verify_response.json().get("content", None)
+        else:
+            verified = "Verification failed"
+        return {
+            "classification": classification,
+            "verified": verified
+        }
+
+    return {
+        "classification": classification
+    }
 
